@@ -859,3 +859,155 @@ def quimb_expectation(state, pauli_string):
 
     # Compute overlap <psi|P|psi>
     return (state.H @ psi_copy)
+
+def make_sim(dim, simmean, simwidth):
+    """
+    Makes randomly matrix in GL(N, C). This matrix can be assumed to be 
+    invertible because the measure of non-invertible matrices when 
+    randomly selecting from C(N) is zero
+
+    Parameters
+    ----------
+    dim : int
+        dimension of matrix
+    simmean : int
+        mean of distribution random complex variables are chosen from
+    simwidth : int
+        width of distribution random complex variables are chosen from
+
+    Returns
+    -------
+    SM : array
+        matrix in GL(N, C)
+
+    """
+    
+    RR = np.random.normal(simmean, simwidth, (dim,dim))
+    SM = RR + 1j * np.random.normal(simmean, simwidth, (dim,dim))
+    return SM
+
+def make_unitary(dim, simmean, simwidth):
+    """
+    Generates unitary matrix via QR decomposition of matrix in GL(N, C)
+    See parameters above
+
+    Returns
+    -------
+    U : array
+        unitary array
+
+    """
+    sim = make_sim(dim, simmean, simwidth)
+    Q, R = np.linalg.qr(sim)
+    Etta = np.zeros((dim,dim), dtype=complex)
+    for j in range(dim):
+        Etta[j,j] = R[j,j]/np.linalg.norm(R[j,j])
+    U = np.matmul(Q, Etta)
+    return U
+
+def make_ortho(dim, simmean, simwidth):
+    """
+    Generates unitary matrix via QR decomposition of matrix in GL(N, C)
+    See parameters above
+
+    Returns
+    -------
+    U : array
+        unitary array
+
+    """
+    sim = np.random.normal(simmean, simwidth, (dim,dim))
+    Q, R = np.linalg.qr(sim)
+    return -1*Q
+
+def dephase(unitary):
+    """
+    Dephases unitary, turns it from U(N) to SU(N)
+
+    Parameters
+    ----------
+    unitary : array
+        input matrix in U(N)
+
+    Returns
+    -------
+    unitary : array
+        depahsed matrix in SU(N)
+
+    """
+    
+    glob = np.linalg.det(unitary)
+    theta = np.arctan(np.imag(glob) / np.real(glob)) / 2
+    unitary = unitary * np.exp(-1j*theta)
+    if np.round(np.linalg.det(unitary)) < 0:
+        unitary = unitary * 1j
+    return unitary
+
+def PPgate():
+    """Generate a random matchgate (particle-preserving gate).
+
+    Creates a 2-qubit matchgate that preserves particle number, constructed
+    from two random SU(2) unitaries in the particle-preserving subspace.
+
+    Returns:
+        np.ndarray: 4x4 matchgate matrix with particle-preserving structure.
+            Has the form with zeros in positions that violate particle conservation.
+
+    Note:
+        Matchgates are equivalent to free fermion evolution and preserve
+        the computational basis weight. Both u1 and u2 are dephased to SU(2).
+    """
+
+    u1 = make_unitary(2, 0, 1)
+    u2 = make_unitary(2, 0, 1)
+    u1 = dephase(u1)
+    u2 = dephase(u2)
+    G_AB = np.array([[u1[0,0], 0, 0, u1[0,1]],
+                      [0, u2[0,0], u2[0,1], 0],
+                      [0, u2[1,0], u2[1,1], 0],
+                      [u1[1, 0], 0, 0, u1[1,1]]])
+    return G_AB
+
+
+def apply_random_matchgate_brickwork(state, depth, n_sites=None):
+    """Apply a random brickwork circuit of matchgates to an MPS state.
+    
+    This function applies a brickwork pattern of random matchgates (particle-preserving 
+    gates) to an MPS state. For each depth layer, gates are applied to alternating 
+    pairs of adjacent sites in a brick pattern:
+    - Even layers: pairs (0,1), (2,3), (4,5), ...
+    - Odd layers: pairs (1,2), (3,4), (5,6), ...
+    
+    Args:
+        state (qtn.MPS): Input MPS state that will be modified in-place.
+        depth (int): Number of layers to apply. Each layer applies gates to 
+                    all possible adjacent pairs in an alternating pattern.
+        n_sites (int, optional): Number of sites in the system. If not provided,
+                                it will be inferred from the MPS state.
+    
+    Returns:
+        None: The function modifies the input state in-place.
+        
+    Examples:
+        >>> import quimb.tensor as qtn
+        >>> # Create a random 10-site MPS with bond dimension 4
+        >>> state = qtn.MPS_rand_state(10, 4)
+        >>> # Apply 6 layers of random matchgate brickwork
+        >>> apply_random_matchgate_brickwork(state, depth=6)
+        
+    Notes:
+        - Matchgates preserve particle number and are equivalent to free fermion evolution
+        - The brickwork pattern ensures all nearest-neighbor interactions are included
+        - Gates are applied using quimb's gate_split method for efficiency
+        - Each gate is a randomly generated matchgate from PPgate()
+    """
+    
+    if n_sites is None:
+        n_sites = state.L
+    
+    for d in range(depth // 2):
+        # Apply gates to all possible adjacent pairs in alternating pattern
+        for sites in np.concatenate([np.arange(0, n_sites - 1, 2), np.arange(1, n_sites - 1, 2)]):
+            # Generate a random matchgate and apply it
+            gate = PPgate()
+            state.gate_split(gate, (sites, sites + 1), inplace=True)

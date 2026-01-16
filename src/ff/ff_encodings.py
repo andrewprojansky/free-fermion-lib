@@ -46,10 +46,28 @@ def Bravyi_Kitaev_encoding(num_qubits):
     return encoding
 
 def Ternary_Tree_encoding(num_qubits):
-    """Generate the Ternary Tree encoding for a given number of qubits."""
-    encoding = []
-    for i in range(num_qubits):
-        pass
+    """Generate the Ternary Tree encoding for a given number of qubits.
+    
+    Technically with this generation method we are generating an the optimally local 
+      encoding slightly different than the original paper, but scaling wise they are the same."""
+    encoding = [""]
+    max_depth = int(np.ceil(np.log(2*num_qubits) / np.log(3)))
+    for i in range(max_depth):
+        new_encoding = []
+        new_length = 3 ** i
+        parents = len(encoding)
+        for j in range(parents):
+            parent = encoding[j]
+            left_child = parent + "I" * (j) + "X" + "I" * (new_length - j-1)
+            middle_child =parent + "I" * (j) + "Y" + "I" * (new_length - j-1)
+            right_child = parent + "I" * (j) + "Z" + "I" * (new_length - j-1)
+            new_encoding.extend([left_child, middle_child, right_child])
+        encoding = new_encoding
+
+    #trims the full tree to get the real encoding 
+    encoding = encoding[:num_qubits*2]
+    for i in range(len(encoding)):
+        encoding[i] = encoding[i][:num_qubits]
     return encoding
 
 def Serpinski_Tree_encoding(num_qubits):

@@ -834,6 +834,8 @@ def FAF(rho, k=2, encoding="jordan-wigner"):
     #FAF = n_sites - np.linalg.norm(pm, k) ** k
 
     # Method 1: Using matrix powers (Equation 27 in reference)
+    if encoding == "1-local":
+        n_sites += int(np.ceil(n_sites/2))
     FAF = n_sites - 0.5 * np.trace(np.linalg.matrix_power(pm.T @ pm, k))
 
     # Method 2: Using eigenvalue distribution (Equation 29 in reference)

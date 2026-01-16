@@ -863,10 +863,10 @@ def compute_cov_matrix_symbolic(rho, n_sites=None, symbolic_paulis=None, encodin
                 # Get both the Pauli string and the phase factor
                 phase, pauli = multiply_symbolic_paulis(symbolic_paulis[i], symbolic_paulis[j], return_phase=True)
                 # Multiply the quimb expectation by the phase to get the correct result
-                if "X" or "Y" in pauli[n_site:]:
+                if "X" in pauli[n_sites:] or "Y" in pauli[n_sites:]:
                     Covf[i, j] = 0
                 else:
-                    Covf[i, j] = phase * quimb_expectation(rho, pauli[:])
+                    Covf[i, j] = phase * quimb_expectation(rho, pauli[:n_sites])
                 Covf[j, i] -= Covf[i, j]
     else:
         Covf = np.zeros((2 * n_sites, 2 * n_sites), dtype=complex)
