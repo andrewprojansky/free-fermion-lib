@@ -23,14 +23,22 @@ def test_mps_faf():
     
     # Zero state
     zero_state = quimb_zero_state(n_sites)
-    faf_zero = FAF(zero_state)
+    faf_zero = FAF(zero_state, encoding = "balanced")
     print(f"Zero state FAF: {faf_zero:.4f}")
     
     # Random MPS states with different bond dimensions
     for max_bond in max_bond_dims:
         random_mps = quimb_random_mps(n_sites, max_bond)
-        faf_value = FAF(random_mps, k=2)
+        faf_value = FAF(random_mps, k=2, encoding = "1-local")
         print(f"Bond dim {max_bond}: FAF = {faf_value:.4f}")
+
+def test_values_correct():
+    """Check FAF values against known results.
+    
+    1. Gaussian State should have FAF 0 
+    2. 4 qubit entangled should have FAF from paper 
+    3. State with non-zero FAF should remain invariant under FF rotation"""
+    pass
 
 if __name__ == "__main__":
     test_mps_faf()

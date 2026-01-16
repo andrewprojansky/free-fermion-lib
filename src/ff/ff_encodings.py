@@ -180,25 +180,37 @@ def multiply_paulis(p1, p2, phase=False):
     else:
         return pauli_mult[(p1, p2)]
 
-def multiply_symbolic_paulis(pauli1, pauli2):
+def multiply_symbolic_paulis(pauli1, pauli2, return_phase=False):
     """Multiply two symbolic Pauli strings
 
     Args:
         pauli1 (str): First symbolic Pauli string
         pauli2 (str): Second symbolic Pauli string
-        phase (bool): Whether to return the phase factor
+        return_phase (bool): Whether to return the phase factor
 
     Returns:
-        tuple: (phase, result) where phase is 1, -1, 1j, or -1j and result is the resulting Pauli string
+        str or tuple: If return_phase is False, returns the resulting Pauli string.
+                     If return_phase is True, returns (total_phase, result) where 
+                     total_phase is the accumulated phase and result is the resulting Pauli string
     """
     if len(pauli1) != len(pauli2):
         raise ValueError("Pauli strings must be of the same length")
 
     result = ""
+    total_phase = 1
 
     for p1, p2 in zip(pauli1, pauli2):
-        result  += multiply_paulis(p1, p2, phase=False)
-    return result
+        if return_phase:
+            phase, pauli_result = multiply_paulis(p1, p2, phase=True)
+            total_phase *= phase
+            result += pauli_result
+        else:
+            result += multiply_paulis(p1, p2, phase=False)
+    
+    if return_phase:
+        return total_phase, result
+    else:
+        return result
 
 '''
 TO QUIMB operators now from symbolic please

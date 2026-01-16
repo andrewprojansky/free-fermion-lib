@@ -396,7 +396,7 @@ def linear_entropy(p):
     return sL
 
 
-def cov_distribution(rho):
+def cov_distribution(rho, encoding="jordan-wigner"):
     """
     Compute the fermionic covariance distribution for a quantum state.
 
@@ -411,7 +411,7 @@ def cov_distribution(rho):
 
     where :math:`\\langle \\alpha_i \\alpha_j \\rangle_c` is the connected
     correlation function and :math:`\\alpha_i` are the Majorana operators
-    under Jordan-Wigner transformation.
+    under the specified fermionic encoding.
 
     The covariance matrix M is real and antisymmetric, and its eigenvalues
     come in pairs ±λ_k. The distribution is formed from the squared
@@ -423,6 +423,9 @@ def cov_distribution(rho):
             - Pure state wavefunction of shape (2^n,) or (2^n, 1)
             The function automatically detects and converts wavefunctions
             to density matrices.
+        encoding (str, optional): Fermionic encoding type. Options are:
+                                 "jordan-wigner", "ternary", "balanced", "1-local".
+                                 Default is "jordan-wigner".
 
     Returns:
         numpy.ndarray: Distribution over squared eigenvalues of the covariance
@@ -467,9 +470,19 @@ def cov_distribution(rho):
     and with more flexible encodings
     '''
 
-    gamma_symbolic = Jordan_Wigner_encoding(n_sites)
+    # Get symbolic Majorana operators based on encoding
+    if encoding.lower() == "jordan-wigner":
+        gamma_symbolic = Jordan_Wigner_encoding(n_sites)
+    elif encoding.lower() == "ternary":
+        gamma_symbolic = Ternary_Tree_encoding(n_sites)
+    elif encoding.lower() == "balanced":
+        gamma_symbolic = Balanced_Jordan_Wigner_encoding(n_sites)
+    elif encoding.lower() == "1-local":
+        gamma_symbolic = One_Local_encoding(n_sites)
+    else:
+        raise ValueError(f"Unknown encoding: {encoding}. Supported encodings: 'jordan-wigner', 'ternary', 'balanced', '1-local'")
 
-    M = -1j * compute_cov_matrix_symbolic(rho, n_sites, symbolic_paulis=gamma_symbolic)
+    M = -1j * compute_cov_matrix_symbolic(rho, n_sites, symbolic_paulis=gamma_symbolic, encoding=encoding)
 
     # M should be real (clean small imaginary parts)
     if np.allclose(np.linalg.norm(M.imag), 0):
@@ -740,7 +753,7 @@ def jensen_shannon_divergence(p, q):
     return djs
 
 
-def FAF(rho, k=2):
+def FAF(rho, k=2, encoding="jordan-wigner"):
     """
     Compute the Fermionic Anti-Flatness (FAF) distance measure.
 
@@ -776,6 +789,9 @@ def FAF(rho, k=2):
         k (int, optional): Norm parameter for the FAF measure. Default is 2.
                           Higher values of k make the measure more sensitive to
                           large eigenvalues in the covariance spectrum.
+        encoding (str, optional): Fermionic encoding type. Options are:
+                                 "jordan-wigner", "ternary", "balanced", "1-local".
+                                 Default is "jordan-wigner".
 
     Returns:
         float: The Fermionic Anti-Flatness FAF_k(ρ).
@@ -811,15 +827,13 @@ def FAF(rho, k=2):
     n_sites = rho.L
 
     # Get the covariance distribution
-    pm = cov_distribution(rho)
+    pm = cov_distribution(rho, encoding=encoding)
 
     # Compute FAF using three equivalent formulations for verification
     # Method 0: Using k-norm of distribution
     #FAF = n_sites - np.linalg.norm(pm, k) ** k
 
     # Method 1: Using matrix powers (Equation 27 in reference)
-    print(pm.shape)
-    print( (pm.T @ pm).shape )
     FAF = n_sites - 0.5 * np.trace(np.linalg.matrix_power(pm.T @ pm, k))
 
     # Method 2: Using eigenvalue distribution (Equation 29 in reference)
