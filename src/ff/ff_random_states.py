@@ -19,6 +19,8 @@ Copyright 2025 James.D.Whitfield@dartmouth.edu
 import numpy as np
 from scipy.linalg import expm, logm
 from scipy.stats import unitary_group
+import quimb.tensor as qtn
+import quimb as qu
 
 from .ff_lib import (
     build_op,
@@ -798,3 +800,62 @@ def build_linear_path(w, v):
         return (s * v + (1 - s) * w) / np.linalg.norm(s * v + (1 - s) * w)
 
     return path
+
+"""
+MPS Support from Quimb - for optimal memory usage
+Replace with Arya's code? 
+"""
+
+def quimb_zero_state(sites):
+
+    return qtn.MPS_computational_state('0'* sites)
+
+def quimb_random_mps(sites, maxdim):
+
+    return qtn.MPS_rand_state(sites, maxdim)
+    
+def quimb_expectation(state, pauli_string):
+    """Compute expectation value of a Pauli string using MPS.
+
+    Computes <psi|P|psi> by applying gates and computing overlap.
+
+    Args:
+        state (qtn.MPS): Quantum state as Matrix Product State.
+        pauli_string (str): Pauli string like "XZIY" (length must match number of qubits).
+
+    Returns:
+        complex: Expectation value <psi|P|psi>.
+
+    Note:
+        This uses the gate-and-overlap method. A compatibility issue with quimb 1.11.2
+        prevents using state.local_expectation() directly. Upgrading quimb or fixing
+        the partial_trace API issue would allow further optimization.
+    """
+    # Pauli matrices
+    pauli = {
+        'I': qu.pauli('I'),
+        'X': qu.pauli('X'),
+        'Y': qu.pauli('Y'),
+        'Z': qu.pauli('Z')
+    }
+
+    # Find non-identity sites and their operators
+    ops = []
+    where = []
+    for i, ch in enumerate(pauli_string):
+        if ch == 'I':
+            continue
+        ops.append(pauli[ch])
+        where.append(i)
+
+    # All identities -> expectation is 1
+    if not ops:
+        return 1.0
+
+    # Compute <psi|P|psi> by applying gates to a copy and computing overlap
+    psi_copy = state.copy()
+    for op, site in zip(ops, where):
+        psi_copy.gate_(op, site)
+
+    # Compute overlap <psi|P|psi>
+    return (state.H @ psi_copy)

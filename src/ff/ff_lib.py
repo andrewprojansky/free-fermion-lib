@@ -22,6 +22,7 @@ from scipy.linalg import expm, logm, schur
 from scipy.stats import special_ortho_group
 
 from .ff_utils import kron_plus  # _print,
+from .ff_encodings import *
 
 
 def permutation_to_matrix(permutation):
@@ -824,6 +825,32 @@ def compute_cov_matrix(rho, n_sites=None, alphas=None):
 
     return Covf
 
+def compute_cov_matrix_symbolic(rho, n_sites=None, symbolic_paulis=None):
+    """
+    Assumes rho is of mps type right now; will add support for general typing 
+    later. 
+    """
+    from .ff_random_states import quimb_expectation
+
+    if n_sites is None:
+        N = rho.shape[0]
+        n_sites = np.round(np.log2(N))
+
+    if symbolic_paulis is None:
+        symbolic_paulis = Jordan_Wigner_encoding(n_sites)
+    pauli_len = len(symbolic_paulis[0])
+
+    if pauli_len > n_sites: 
+        n_sites = pauli_len
+
+    Covf = np.zeros((2 * n_sites, 2 * n_sites), dtype=complex)
+    for i in range(2 * n_sites):
+        for j in range(i+1, 2 * n_sites):
+            pauli = multiply_symbolic_paulis(symbolic_paulis[i], symbolic_paulis[j])
+            Covf[i, j] = quimb_expectation(rho, pauli)
+            Covf[j, i] -= Covf[i, j]
+
+    return Covf
 
 def correlation_matrix(rho):
     r"""

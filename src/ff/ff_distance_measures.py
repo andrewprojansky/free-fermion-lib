@@ -28,8 +28,9 @@ import numpy as np
 from scipy.linalg import schur
 from scipy.stats import entropy
 
-from .ff_lib import compute_cov_matrix, generate_pauli_group, jordan_wigner_majoranas
+from .ff_lib import compute_cov_matrix, generate_pauli_group, jordan_wigner_majoranas, compute_cov_matrix_symbolic
 from .ff_utils import cast_to_density_matrix, cast_to_pdf, clean
+from .ff_encodings import *
 
 
 def stabilizer_distribution(rho):
@@ -449,22 +450,34 @@ def cov_distribution(rho):
           Sierant, Stornati, and Turkeshi (arXiv:2506.00116)
     """
 
-    rho = cast_to_density_matrix(rho)
+    #rho = cast_to_density_matrix(rho)
 
-    # Determine number of sites from Hilbert space dimension
-    n_sites = int(np.log2(rho.shape[0]))
-
+    # Determine number of sites from Hilbert space dimension - updated for quimb
+    n_sites = rho.L
     # d = 2**n_sites
-
     # Get Majorana operators
+    
+    '''
     gammas = jordan_wigner_majoranas(n_sites)
 
     # Compute fermionic covariance matrix
     M = -1j * compute_cov_matrix(rho, n_sites, alphas=gammas)
 
+    # Alternative: Updated cov calculation with better memory allocation
+    and with more flexible encodings
+    '''
+
+    gamma_symbolic = Jordan_Wigner_encoding(n_sites)
+
+    M = -1j * compute_cov_matrix_symbolic(rho, n_sites, symbolic_paulis=gamma_symbolic)
+
     # M should be real (clean small imaginary parts)
     if np.allclose(np.linalg.norm(M.imag), 0):
         M = M.real
+
+    return M
+
+    """
 
     # Verify M is antisymmetric: M = -M^T
     assert np.allclose(
@@ -485,6 +498,8 @@ def cov_distribution(rho):
     pm = np.square(eigenvalues)
 
     return pm
+
+    """
 
 
 def total_variation_distance(p, q):
@@ -790,19 +805,22 @@ def FAF(rho, k=2):
           arXiv:2506.00116
     """
 
-    rho = cast_to_density_matrix(rho)
-
-    n_sites = int(np.log2(rho.shape[0]))
+    #rho = cast_to_density_matrix(rho)
+    
+    # Determine number of site
+    n_sites = rho.L
 
     # Get the covariance distribution
     pm = cov_distribution(rho)
 
     # Compute FAF using three equivalent formulations for verification
     # Method 0: Using k-norm of distribution
-    FAF = n_sites - np.linalg.norm(pm, k) ** k
+    #FAF = n_sites - np.linalg.norm(pm, k) ** k
 
     # Method 1: Using matrix powers (Equation 27 in reference)
-    # FAF_27 = n_sites - 0.5 * np.trace(np.linalg.matrix_power(M.T @ M, k))
+    print(pm.shape)
+    print( (pm.T @ pm).shape )
+    FAF = n_sites - 0.5 * np.trace(np.linalg.matrix_power(pm.T @ pm, k))
 
     # Method 2: Using eigenvalue distribution (Equation 29 in reference)
     # FAF_29 = n_sites - np.sum(np.power(pm, k))
